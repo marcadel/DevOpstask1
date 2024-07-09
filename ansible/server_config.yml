@@ -1,0 +1,338 @@
+---
+- hosts: webserver
+  become: yes
+  tasks:
+
+###########################################################
+## apt update
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+
+###########################################################
+## Apache install and configure it to 8080 port
+    - name: Install Apache HTTP Server
+      apt:
+        name: apache2
+        state: present
+
+    - name: Configure Apache to listen on port 8080
+      lineinfile:
+        path: /etc/apache2/ports.conf
+        regexp: '^Listen '
+        line: 'Listen 8080'
+        state: present
+        backup: yes
+
+    - name: Ensure Apache mod_rewrite is enabled
+      apache2_module:
+        name: rewrite
+        state: present
+
+    - name: Restart Apache service to apply port change
+      service:
+        name: apache2
+        state: restarted
+        enabled: yes
+
+    - name: Ensure Apache service is running
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+        
+########################################################### 
+## Docker compose
+    - name: Update the apt package index
+      apt:
+        update_cache: yes
+
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Update apt package index after adding Docker repo
+      apt:
+        update_cache: yes
+
+    - name: Install Docker
+      apt:
+        name: docker-ce
+        state: present
+
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Install Docker Compose
+      apt:
+        name: docker-compose
+        state: present
+      become: yes
+      tags:
+        - docker
+
+    - name: Create project directory
+      file:
+        path: /pwc/sonar-postgres
+        state: directory
+
+    - name: Copy Docker Compose file
+      copy:
+        src: /home/mark/PwC V2/docker/docker-compose.yml
+        dest: /pwc/sonar-postgres/docker-compose.yml
+        mode: '0600' 
+
+    - name: Start Docker containers with Docker Compose
+      community.docker.docker_compose_v2:
+        project_src: /pwc/sonar-postgres
+        files:
+        - docker-compose.yml
+
+###########################################################
+## Nginx Install
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+      tags: nginx
+
+    - name: Start Nginx service
+      service:
+        name: nginx
+        state: started
+      tags: nginx
+
+    - name: Create Nginx site configuration
+      template:
+        src: /home/mark/PwC/ansible/nginx-reverseproxy.conf.j2
+        dest: /etc/nginx/sites-available/reverse-proxy.conf
+
+    - name: Enable the Nginx site configuration
+      file:
+        src: /etc/nginx/sites-available/reverse-proxy.conf
+        dest: /etc/nginx/sites-enabled/reverse-proxy.conf
+        state: link
+
+    - name: Remove the default Nginx site configuration
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      ignore_errors: yes
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      ignore_errors: yes
+
+    - name: Fail if Nginx configuration test failed
+      fail:
+        msg: "Nginx configuration test failed"
+      when: nginx_test.rc != 0
+
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+
+
+
+
+
+
+    # - name: Install Docker dependencies
+    #   apt:
+    #     name: "{{ item }}"
+    #     state: present
+    #   with_items:
+    #     - apt-transport-https
+    #     - ca-certificates
+    #     - curl
+    #     - gnupg
+    #     - lsb-release
+    #     - software-properties-common
+    #     - python3-pip
+    #   tags: docker
+
+
+
+    # - name: Install Docker
+    #   apt:
+    #     name: docker-io
+    #     state: present
+    #     update_cache: yes
+    #   tags: docker
+
+    # - name: Ensure Docker service is started
+    #   systemd:
+    #     name: docker
+    #     state: started
+    #     enabled: yes
+
+
+
+
+
+    # - name: Install Docker dependencies
+    #   apt:
+    #     name: "{{ item }}"
+    #     state: present
+    #   with_items:
+    #     - apt-transport-https
+    #     - ca-certificates
+    #     - curl
+    #     - gnupg
+    #     - lsb-release
+    #     - software-properties-common
+    #     - python3-pip
+    #   tags: docker
+
+
+    # - name: Install pipx
+    #   shell: |
+    #     python3 -m pip install --user pipx
+    #     python3 -m pipx ensurepath
+    #   args:
+    #     executable: /bin/bash
+
+
+    # - name: Install Docker Compose using pipx
+    #   shell: |
+    #     /root/.local/bin/pipx install docker-compose
+    #   args:
+    #     executable: /bin/bash
+
+
+    # - name: Ensure pipx binaries path is present in the PATH
+    #   shell: |
+    #     echo 'export PATH=$PATH:/root/.local/bin' >> ~/.bashrc
+    #     export PATH=$PATH:/root/.local/bin
+    #   args:
+    #     executable: /bin/bash
+
+    # - name: Install Docker
+    #   apt:
+    #     name: docker-ce
+    #     state: present
+    #     update_cache: yes
+    #   tags: docker
+
+    # - name: Ensure Docker service is started
+    #   systemd:
+    #     name: docker
+    #     state: started
+    #     enabled: yes
+
+
+    # - name: Install Docker
+    #   apt:
+    #     name: docker.io
+    #     state: present
+    #     update_cache: yes
+
+    # - name: Update package lists
+    #   apt:
+    #     update_cache: yes
+
+    # - name: Ensure Docker dependencies are installed
+    #   apt:
+    #     name:
+    #       - curl
+    #       - python3-pip
+    #       - docker.io
+    #     state: present
+    #     update_cache: yes
+
+    # - name: Install Docker Compose
+    #   pip:
+    #     name: docker-compose
+    #     executable: pip3
+    #     extra_args: --user
+
+    # - name: Ensure Docker service is started
+    #   systemd:
+    #     name: docker
+    #     state: started
+    #     enabled: yes
+
+
+
+####################################################################################################   
+
+
+    # - name: Add Docker GPG key
+    #   apt_key:
+    #     url: https://download.docker.com/linux/ubuntu/gpg
+    #     state: present
+    #   tags: docker
+
+    # - name: Add Docker repository
+    #   apt_repository:
+    #     repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    #     state: present
+    #   tags: docker
+
+
+####################################################################################################  
+
+
+
+
+####################################################################################################   
+
+
+    # - name: Create project directory
+    #   file:
+    #     path: /opt/sonar-postgres
+    #     state: directory
+
+    # - name: Copy docker-compose.yml to project directory
+    #   copy:
+    #     src: /home/mark/PwC/docker/docker-compose.yml
+    #     dest: /opt/sonar-postgres/docker-compose.yml
+
+    # - name: Copy Dockerfile to project directory
+    #   copy:
+    #     src: /home/mark/PwC/docker/Dockerfile
+    #     dest: /opt/sonar-postgres/Dockerfile
+
+    # - name: Copy sonar.properties to project directory
+    #   copy:
+    #     src: /home/mark/PwC/docker/sonar.properties
+    #     dest: /opt/sonar-postgres/sonar.properties     
+
+    # - name: Validate Docker Compose file
+    #   command: docker-compose config
+    #   args:
+    #     chdir: /opt/sonar-postgres           
+
+    # - name: Build the custom SonarQube image
+    #   command: docker-compose build
+    #   args:
+    #     chdir: /opt/sonar-postgres
+
+    # - name: Run Docker Compose
+    #   command: docker-compose up -d
+    #   args:
+    #     chdir: /opt/sonar-postgres
+
+
+####################################################################################################   

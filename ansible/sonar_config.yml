@@ -1,0 +1,256 @@
+---
+- name: Manage SonarQube Container on Ubuntu
+  hosts: all
+  become: yes
+  vars:
+    sonar_properties_path: /opt/sonarqube/conf/sonar.properties
+
+  tasks:
+    - name: Ensure Docker dependencies are installed
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      with_items:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+
+    - name: Remove conflicting containerd packages
+      apt:
+        name: "{{ item }}"
+        state: absent
+      with_items:
+        - containerd
+        - containerd.io
+
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Check if SonarQube container is running
+      command: docker ps --filter "name=sonarqube" --format "{{ '{{' }}.Names{{ '}}' }}"
+      register: result
+      failed_when: false
+
+    - name: Start SonarQube container if not running
+      command: >
+        docker run -d --name sonarqube
+        -p 9000:9000
+        sonarqube
+      when: result.stdout == ""
+
+    - name: Get SonarQube container ID
+      command: docker ps -q --filter "name=sonarqube"
+      register: container_id
+
+    - name: Copy sonar.properties from container to host
+      command: docker cp {{ container_id.stdout }}:{{ sonar_properties_path }} /tmp/sonar.properties
+
+    - name: Add sonar.web.context to sonar.properties
+      lineinfile:
+        path: /tmp/sonar.properties
+        line: "sonar.web.context=/sonarqube"
+        create: yes
+
+    - name: Copy modified sonar.properties back to container
+      command: docker cp /tmp/sonar.properties {{ container_id.stdout }}:{{ sonar_properties_path }}
+
+    - name: Restart SonarQube container
+      command: docker restart {{ container_id.stdout }}
+
+
+
+
+
+
+
+
+
+
+
+
+# ---
+# - name: Manage SonarQube Container on Ubuntu
+#   hosts: all
+#   become: yes
+#   vars:
+#     sonar_properties_path: /opt/sonarqube/conf/sonar.properties
+
+#   tasks:
+#     - name: Ensure Docker dependencies are installed
+#       apt:
+#         name: "{{ item }}"
+#         state: present
+#         update_cache: yes
+#       with_items:
+#         - apt-transport-https
+#         - ca-certificates
+#         - curl
+#         - software-properties-common
+
+#     - name: Remove conflicting containerd packages
+#       apt:
+#         name: "{{ item }}"
+#         state: absent
+#       with_items:
+#         - containerd
+#         - containerd.io
+
+#     - name: Install Docker
+#       apt:
+#         name: docker.io
+#         state: present
+#         update_cache: yes
+
+#     - name: Ensure Docker service is running
+#       service:
+#         name: docker
+#         state: started
+#         enabled: yes
+
+#     - name: Check if SonarQube container is running
+#       command: docker ps --filter "name=sonarqube" --format "{{ '{{' }}.Names{{ '}}' }}"
+#       register: result
+#       failed_when: false
+
+#     - name: Stop and remove existing SonarQube container
+#       docker_container:
+#         name: sonarqube
+#         state: absent
+#       when: sonar_container_id is defined and sonar_container_id.rc == 0
+
+#     - name: Start SonarQube container
+#       docker_container:
+#         name: sonarqube
+#         image: sonarqube
+#         state: started
+#         restart_policy: always
+#         ports:
+#           - "9000:9000"
+
+#     - name: Get SonarQube container ID
+#       command: docker ps -q --filter "name=sonarqube"
+#       register: container_id
+
+#     - name: Copy sonar.properties from container to host
+#       command: docker cp {{ container_id.stdout }}:{{ sonar_properties_path }} /tmp/sonar.properties
+
+#     - name: Add sonar.web.context to sonar.properties
+#       lineinfile:
+#         path: /tmp/sonar.properties
+#         line: "sonar.web.context=/sonarqube"
+#         create: yes
+
+#     - name: Copy modified sonar.properties back to container
+#       command: docker cp /tmp/sonar.properties {{ container_id.stdout }}:{{ sonar_properties_path }}
+
+#     - name: Restart SonarQube container
+#       command: docker restart {{ container_id.stdout }}
+
+
+
+
+# # ---
+# # - name: Manage Docker and SonarQube Container on Ubuntu
+# #   hosts: 44.231.25.170
+# #   become: yes
+# #   gather_facts: yes
+
+# #   tasks:
+# #     - name: Ensure Docker dependencies are installed
+# #       apt:
+# #         name: "{{ item }}"
+# #         state: present
+# #       loop:
+# #         - apt-transport-https
+# #         - ca-certificates
+# #         - curl
+# #         - software-properties-common
+
+# #     - name: Remove conflicting containerd packages
+# #       apt:
+# #         name: "{{ item }}"
+# #         state: absent
+# #       loop:
+# #         - containerd
+# #         - containerd.io
+
+# #     - name: Install Docker
+# #       apt:
+# #         name: docker.io
+# #         state: present
+
+# #     - name: Ensure Docker service is running
+# #       service:
+# #         name: docker
+# #         state: started
+# #       failed_when: false
+# #       ignore_errors: no
+
+# #     - name: Check Docker service status
+# #       command: systemctl status docker.service
+# #       register: docker_status
+# #       ignore_errors: yes
+
+# #     - name: Debug Docker service status
+# #       debug:
+# #         var: docker_status.stdout_lines
+# #       when: docker_status is defined and docker_status.rc != 0
+
+# #     - name: Check if SonarQube container is running
+# #       shell: docker ps -q --filter name=sonarqube
+# #       register: sonar_container_id
+# #       ignore_errors: yes
+
+# #     - name: Fail if SonarQube container check fails
+# #       fail:
+# #         msg: "SonarQube container is not running."
+# #       when: sonar_container_id.rc != 0
+
+# #     - name: Start or restart SonarQube container
+# #       shell: |
+# #         docker rm -f sonarqube || true
+# #         docker run -d --name sonarqube -p 9000:9000 sonarqube
+# #       ignore_errors: no
+# #       notify:
+# #         - restart sonarqube
+
+# #     - name: Wait for SonarQube to start
+# #       wait_for:
+# #         host: localhost
+# #         port: 9000
+# #         state: started
+# #       become: false
+# #       ignore_errors: yes
+
+# #     - name: Copy sonar.properties from container to host
+# #       command: docker cp {{ container_id.stdout }}:{{ sonar_properties_path }} /tmp/sonar.properties
+
+# #     - name: Add sonar.web.context to sonar.properties
+# #       lineinfile:
+# #         path: /tmp/sonar.properties
+# #         line: "sonar.web.context=/sonarqube"
+# #         create: yes
+
+# #     - name: Copy modified sonar.properties back to container
+# #       command: docker cp /tmp/sonar.properties {{ container_id.stdout }}:{{ sonar_properties_path }}
+
+# #     - name: Restart SonarQube container
+# #       command: docker restart {{ container_id.stdout }}
+
+# #   handlers:
+# #     - name: restart sonarqube
+# #       docker_container:
+# #         name: sonarqube
+# #         state: restarted
+# #       become: yes

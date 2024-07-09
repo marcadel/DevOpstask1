@@ -1,0 +1,31 @@
+server {
+    listen 80;
+    server_name 44.231.25.170;
+
+    # Reverse proxy for Apache Server
+    location /apache/ {
+        proxy_pass http://localhost:8080;  # Forward requests to Apache Server on port 8080
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        # Ensure that the URL path is correct
+        rewrite ^/apache(/.*)$ $1 break;
+    }
+
+    # Reverse proxy for SonarQube
+    location /sonarqube/ {
+        proxy_pass http://localhost:9000;  # Forward requests to SonarQube on port 9000
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        # Ensure that the URL path is correct
+        rewrite ^/sonar(/.*)$ $1 break;
+    }
+
+    # Optionally, serve a default root or index page
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
