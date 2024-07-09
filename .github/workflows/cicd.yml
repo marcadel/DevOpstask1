@@ -36,7 +36,7 @@ jobs:
       - name: create Inventory
         run: |
           cd terraform
-          terraform output PwCServer_eip | tail -n +2 | sed 's/"//g' >> ansible/inventory
+          terraform output PwCServer_eip | tail -n +2 | sed 's/"//g' >> ../ansible/inventory
 
       - name: Show Inventory
         run: cat ansible/inventory
