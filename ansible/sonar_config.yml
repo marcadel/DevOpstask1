@@ -44,9 +44,7 @@
 
     - name: Start SonarQube container if not running
       command: >
-        docker run -d --name sonarqube
-        -p 9000:9000
-        sonarqube
+        docker run -d --name sonarqube -p 9000:9000 sonarqube
       when: result.stdout == ""
 
     - name: Get SonarQube container ID
