@@ -55,5 +55,5 @@ jobs:
   
       - name: Run Ansible Playbook
         run: |
-          cd ansible
+          cd ../ansible
           ansible-playbook playbook.yaml
