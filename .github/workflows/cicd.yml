@@ -38,9 +38,6 @@ jobs:
           cd terraform
           terraform output PwCServer_eip | tail -n +2 | sed 's/"//g' >> ../ansible/inventory
 
-      - name: Show Inventory
-        run: cat ansible/inventory
-
       - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh
