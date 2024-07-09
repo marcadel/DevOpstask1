@@ -53,5 +53,5 @@ jobs:
       - name: Run Ansible Playbook
         run: |
           cd ansible
-          ansible-playbook server_config.yaml
-          ansible-playbook sonar_config.yaml
+          ansible-playbook server_config.yml
+          ansible-playbook sonar_config.yml
